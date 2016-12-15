@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" id="cordova-plugin-battery-advanced" version="0.2.3">
+    <name>BatteryAdvanced</name>
+    <description>Cordova Battery Advanced Plugin</description>
+    <license>Apache 2.0</license>
+    <keywords>cordova,battery,advanced</keywords>
+
+    <js-module src="www/BatteryAdvanced.js" name="BatteryAdvanced">
+        <!--<clobbers target="BatteryAdvanced"/>-->
+        <runs/>
+    </js-module>
+
+    <!-- Android is the only supported platform -->
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="Echo" >
+                <param name="android-package" value="pl.edu.agh.mcc.BatteryAdvanced"/>
+            </feature>
+        </config-file>
+
+        <source-file src="src/BatteryAdvanced.java" target-dir="src/pl/edu/agh/mcc" />
+    </platform>
+</plugin>
