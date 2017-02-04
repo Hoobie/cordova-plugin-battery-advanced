@@ -13,11 +13,11 @@
     <!-- Android is the only supported platform -->
     <platform name="android">
         <config-file target="res/xml/config.xml" parent="/*">
-            <feature name="Echo" >
+            <feature name="BatteryAdvanced">
                 <param name="android-package" value="pl.edu.agh.mcc.BatteryAdvanced"/>
             </feature>
         </config-file>
 
-        <source-file src="src/BatteryAdvanced.java" target-dir="src/pl/edu/agh/mcc" />
+        <source-file src="src/BatteryAdvanced.java" target-dir="src/pl/edu/agh/mcc"/>
     </platform>
 </plugin>

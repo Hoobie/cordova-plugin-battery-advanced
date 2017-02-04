@@ -26,3 +26,5 @@ crashlytics-build.properties
 fabric.properties
 
 cordova-plugin-battery-advanced.iml
+
+lib

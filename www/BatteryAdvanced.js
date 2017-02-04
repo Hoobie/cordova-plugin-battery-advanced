@@ -1,7 +1,7 @@
 const cordova = require('cordova');
 
-window.echo = function(str, callback) {
+window.checkBatteryStatus = function(callback) {
     cordova.exec(callback, function(err) {
-        callback('Nothing to echo.');
-    }, "Echo", "echo", [str]);
+        callback(err);
+    }, "BatteryAdvanced", "check", []);
 };
