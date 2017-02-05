@@ -18,6 +18,6 @@
             </feature>
         </config-file>
 
-        <source-file src="src/BatteryAdvanced.java" target-dir="src/pl/edu/agh/mcc"/>
+        <source-file src="src/pl/edu/agh/mcc/BatteryAdvanced.java" target-dir="src/pl/edu/agh/mcc"/>
     </platform>
 </plugin>
