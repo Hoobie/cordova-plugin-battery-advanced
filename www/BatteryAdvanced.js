@@ -1,7 +1,13 @@
 const cordova = require('cordova');
 
-window.checkBatteryStatus = function(callback) {
-    cordova.exec(callback, function(err) {
+window.startPowerMeasurements = function (callback) {
+    cordova.exec(callback, function (err) {
         callback(err);
-    }, "BatteryAdvanced", "check", []);
+    }, "BatteryAdvanced", "start", []);
+};
+
+window.stopPowerMeasurements = function (callback) {
+    cordova.exec(callback, function (err) {
+        callback(err);
+    }, "BatteryAdvanced", "stop", []);
 };
