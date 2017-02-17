@@ -2,6 +2,9 @@ package pl.edu.agh.mcc;
 
 import android.content.Context;
 import android.net.TrafficStats;
+import android.net.wifi.WifiManager;
+import android.os.Process;
+import android.os.SystemClock;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
@@ -18,7 +21,9 @@ import java.util.concurrent.TimeUnit;
 public class BatteryAdvanced extends CordovaPlugin {
 
     private static final int SECONDS_PER_HOUR = 3600;
-    private static final int SECOND_HUNDREDS_PER_HOUR = 360000;
+    // _SC_CLK_TCK
+    private static final int CLOCK_TICKS_PER_SECOND = 100;
+    private static final int MILLIS_PER_CLOCK_TICK = 1000 / CLOCK_TICKS_PER_SECOND;
     private static final Map<String, Double> COMPONENTS_DRAIN_MAH = new HashMap<String, Double>();
     private static final ScheduledExecutorService EXECUTOR_SERVICE = Executors.newSingleThreadScheduledExecutor();
 
@@ -37,7 +42,7 @@ public class BatteryAdvanced extends CordovaPlugin {
         return false;
     }
 
-    private void startMeasurements(CallbackContext callbackContext) {
+    void startMeasurements(CallbackContext callbackContext) {
         try {
             COMPONENTS_DRAIN_MAH.put("wifi", 0.0);
             COMPONENTS_DRAIN_MAH.put("mobile", 0.0);
@@ -58,15 +63,16 @@ public class BatteryAdvanced extends CordovaPlugin {
         callbackContext.success();
     }
 
-    private void stopMeasurements(CallbackContext callbackContext) {
+    void stopMeasurements(CallbackContext callbackContext) {
         JSONObject obj = new JSONObject();
         try {
             CpuInfo nextCpuInfo = readCpuInfo();
             long cpuActiveTime = nextCpuInfo.activeTime - previousCpuInfo.activeTime;
             long cpuIdleTime = nextCpuInfo.idleTime - previousCpuInfo.idleTime;
-            double cpuDrainMAh = getAveragePower("cpu.idle") * cpuIdleTime / SECOND_HUNDREDS_PER_HOUR
-                    + getAveragePower("cpu.active") * cpuActiveTime / SECOND_HUNDREDS_PER_HOUR
-                    + getAveragePower("cpu.idle") * cpuActiveTime / SECOND_HUNDREDS_PER_HOUR;
+            int ticksPerHour = CLOCK_TICKS_PER_SECOND * SECONDS_PER_HOUR;
+            double cpuDrainMAh = (getAveragePower("cpu.idle") * cpuIdleTime / ticksPerHour)
+                    + (getAveragePower("cpu.active") * cpuActiveTime / ticksPerHour)
+                    + (getAveragePower("cpu.idle") * cpuActiveTime / ticksPerHour);
             previousCpuInfo = nextCpuInfo;
 
             long measurementInterval = System.currentTimeMillis() - previousMeasurementMillis;
@@ -79,7 +85,7 @@ public class BatteryAdvanced extends CordovaPlugin {
             obj.put("mobile", COMPONENTS_DRAIN_MAH.get("mobile"));
             double total = cpuDrainMAh + COMPONENTS_DRAIN_MAH.get("wifi") + COMPONENTS_DRAIN_MAH.get("mobile");
             obj.put("total", total);
-            obj.put("total%", total / getAveragePower("battery.capacity"));
+            obj.put("total%", total / getAveragePower("battery.capacity") * 100);
         } catch (Exception e) {
             callbackContext.error(e.getCause() + ": " + e.getMessage());
         }
@@ -126,20 +132,25 @@ public class BatteryAdvanced extends CordovaPlugin {
     }
 
     CpuInfo readCpuInfo() throws Exception {
-        RandomAccessFile reader = new RandomAccessFile("/proc/stat", "r");
-        String load = reader.readLine();
+        RandomAccessFile reader = new RandomAccessFile("/proc/" + Process.myPid() + "/stat", "r");
+        String line = reader.readLine();
         reader.close();
 
-        String[] split = load.split("\\s+");
+        String[] split = line.split("\\s+");
 
-        long activeTime = Long.parseLong(split[1]) + Long.parseLong(split[2]) + Long.parseLong(split[3]) +
-                Long.parseLong(split[5]) + Long.parseLong(split[6]) + Long.parseLong(split[7]);
-        long idleTime = Long.parseLong(split[4]);
+        // utime stime cutime cstime
+        long activeTimeTicks = Long.parseLong(split[13]) + Long.parseLong(split[14]) + Long.parseLong(split[15]) +
+                Long.parseLong(split[16]);
+        long processStartTimeTicks = Long.parseLong(split[21]);
 
-        return new CpuInfo(activeTime, idleTime);
+        long systemUptimeMillis = SystemClock.uptimeMillis();
+        long processUptimeTicks = (systemUptimeMillis / MILLIS_PER_CLOCK_TICK) - processStartTimeTicks;
+        long idleTimeTicks = processUptimeTicks - activeTimeTicks;
+
+        return new CpuInfo(activeTimeTicks, idleTimeTicks);
     }
 
-    class CpuInfo {
+    static class CpuInfo {
         long activeTime;
         long idleTime;
 
@@ -156,10 +167,14 @@ public class BatteryAdvanced extends CordovaPlugin {
         long mobileTxBytes;
 
         TransferInfo() {
-            mobileRxBytes = TrafficStats.getMobileRxBytes();
-            mobileTxBytes = TrafficStats.getMobileTxBytes();
-            wifiRxBytes = TrafficStats.getTotalRxBytes() - mobileRxBytes;
-            wifiTxBytes = TrafficStats.getTotalTxBytes() - mobileTxBytes;
+            WifiManager wifi = (WifiManager) webView.getContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifi.isWifiEnabled()) {
+                wifiRxBytes = TrafficStats.getUidRxBytes(Process.myUid());
+                wifiTxBytes = TrafficStats.getUidTxBytes(Process.myUid());
+            } else {
+                mobileRxBytes = TrafficStats.getUidRxBytes(Process.myUid());
+                mobileTxBytes = TrafficStats.getUidTxBytes(Process.myUid());
+            }
         }
 
         boolean wasWifiReceiving(TransferInfo nextInfo) {
