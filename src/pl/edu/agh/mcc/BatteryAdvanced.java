@@ -80,6 +80,10 @@ public class BatteryAdvanced extends CordovaPlugin {
                 measureTransferDrains(measurementInterval / 1000);
             }
 
+            obj.put("cpuActivePower", getAveragePower("cpu.active", 3));
+            obj.put("wifiActivePower", getAveragePower("wifi.active"));
+            obj.put("mobileActivePower", getAveragePower("radio.active"));
+
             obj.put("cpu", cpuDrainMAh);
             obj.put("wifi", COMPONENTS_DRAIN_MAH.get("wifi"));
             obj.put("mobile", COMPONENTS_DRAIN_MAH.get("mobile"));
@@ -98,10 +102,10 @@ public class BatteryAdvanced extends CordovaPlugin {
         double mobileDrainMAh = COMPONENTS_DRAIN_MAH.get("mobile");
         try {
             if (previousTransferInfo.wasWifiReceiving(nextTransferInfo)) {
-                wifiDrainMAh += getAveragePower("wifi.controller.rx") / SECONDS_PER_HOUR * scale;
+                wifiDrainMAh += getAveragePower("wifi.active") / SECONDS_PER_HOUR * scale;
             }
             if (previousTransferInfo.wasWifiTransmitting(nextTransferInfo)) {
-                wifiDrainMAh += getAveragePower("wifi.controller.tx") / SECONDS_PER_HOUR * scale;
+                wifiDrainMAh += getAveragePower("wifi.active") / SECONDS_PER_HOUR * scale;
             }
             if (previousTransferInfo.wasMobileReceiving(nextTransferInfo)
                     || previousTransferInfo.wasMobileTransmitting(nextTransferInfo)) {
@@ -117,6 +121,11 @@ public class BatteryAdvanced extends CordovaPlugin {
     double getAveragePower(String componentState) throws Exception {
         return invokePowerProfileMethod("getAveragePower", Double.class,
                 new Class[]{String.class}, new Object[]{componentState});
+    }
+
+    double getAveragePower(String componentState, int level) throws Exception {
+        return invokePowerProfileMethod("getAveragePower", Double.class,
+                new Class[]{String.class, int.class}, new Object[]{componentState, level});
     }
 
     private <T> T invokePowerProfileMethod(String methodName, Class<T> returnType, Class<?>[] argTypes, Object[] args)
