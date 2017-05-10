@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 public class BatteryAdvanced extends CordovaPlugin {
@@ -30,6 +31,7 @@ public class BatteryAdvanced extends CordovaPlugin {
     private static CpuInfo previousCpuInfo;
     private static TransferInfo previousTransferInfo;
     private static long previousMeasurementMillis;
+    private static ScheduledFuture scheduledFuture;
 
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
@@ -47,12 +49,12 @@ public class BatteryAdvanced extends CordovaPlugin {
             COMPONENTS_DRAIN_MAH.put("wifi", 0.0);
             COMPONENTS_DRAIN_MAH.put("mobile", 0.0);
 
-            EXECUTOR_SERVICE.scheduleAtFixedRate(new Runnable() {
+            scheduledFuture = EXECUTOR_SERVICE.scheduleAtFixedRate(new Runnable() {
                 @Override
                 public void run() {
-                    measureTransferDrains(1.0);
+                    measureTransferDrains(0.5);
                 }
-            }, 1000, 1000, TimeUnit.MILLISECONDS);
+            }, 500, 500, TimeUnit.MILLISECONDS);
 
             previousTransferInfo = new TransferInfo();
             previousCpuInfo = readCpuInfo();
@@ -75,6 +77,9 @@ public class BatteryAdvanced extends CordovaPlugin {
                     + (getAveragePower("cpu.idle") * cpuActiveTime / ticksPerHour);
             previousCpuInfo = nextCpuInfo;
 
+            if (scheduledFuture != null) {
+                scheduledFuture.cancel(false);
+            }
             long measurementInterval = System.currentTimeMillis() - previousMeasurementMillis;
             if (measurementInterval > 100 && measurementInterval < 900) {
                 measureTransferDrains(measurementInterval / 1000);
@@ -101,10 +106,8 @@ public class BatteryAdvanced extends CordovaPlugin {
         double wifiDrainMAh = COMPONENTS_DRAIN_MAH.get("wifi");
         double mobileDrainMAh = COMPONENTS_DRAIN_MAH.get("mobile");
         try {
-            if (previousTransferInfo.wasWifiReceiving(nextTransferInfo)) {
-                wifiDrainMAh += getAveragePower("wifi.active") / SECONDS_PER_HOUR * scale;
-            }
-            if (previousTransferInfo.wasWifiTransmitting(nextTransferInfo)) {
+            if (previousTransferInfo.wasWifiReceiving(nextTransferInfo)
+                    || previousTransferInfo.wasWifiTransmitting(nextTransferInfo)) {
                 wifiDrainMAh += getAveragePower("wifi.active") / SECONDS_PER_HOUR * scale;
             }
             if (previousTransferInfo.wasMobileReceiving(nextTransferInfo)
